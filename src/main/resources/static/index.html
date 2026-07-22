@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tic Tac Toe</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Roboto, Arial, sans-serif;
+    background: #1e1e2f;
+    color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  h1 { margin: 0 0 8px; font-size: 24px; }
+  #joinScreen, #gameScreen { width: 100%; max-width: 380px; }
+  #gameScreen { display: none; text-align: center; }
+  input {
+    width: 100%;
+    padding: 12px;
+    font-size: 18px;
+    border-radius: 8px;
+    border: none;
+    margin-bottom: 12px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    border-radius: 8px;
+    border: none;
+    background: #4f8cff;
+    color: white;
+    font-weight: bold;
+    margin-top: 8px;
+  }
+  button:active { background: #3a6fd6; }
+  #status { margin: 16px 0; font-size: 18px; min-height: 24px; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .cell {
+    aspect-ratio: 1;
+    background: #2c2c44;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: bold;
+    user-select: none;
+  }
+  .cell.x { color: #4f8cff; }
+  .cell.o { color: #ff6b6b; }
+  #roomLabel { opacity: 0.7; font-size: 14px; }
+  #markLabel { font-size: 20px; font-weight: bold; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>Tic Tac Toe</h1>
+
+<div id="joinScreen">
+  <p>Enter the same room code on both phones to play together.</p>
+  <input id="roomInput" placeholder="ROOM CODE" maxlength="10">
+  <button onclick="joinRoom()">Join Room</button>
+</div>
+
+<div id="gameScreen">
+  <div id="roomLabel"></div>
+  <div id="markLabel"></div>
+  <div id="status"></div>
+  <div id="board"></div>
+  <button onclick="restartGame()">Restart Game</button>
+</div>
+
+<script>
+  let ws = null;
+  let myMark = null;
+  let currentRoom = null;
+
+  function joinRoom() {
+    const room = document.getElementById('roomInput').value.trim().toUpperCase();
+    if (!room) { alert('Please enter a room code'); return; }
+    currentRoom = room;
+
+    // Build ws:// or wss:// URL relative to whatever host the page was loaded from,
+    // so it works whether you're on http or https.
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = protocol + '//' + window.location.host + '/ws/tictactoe';
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'join', room: currentRoom }));
+    };
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      handleServerMessage(msg);
+    };
+
+    ws.onclose = () => {
+      setStatus('Disconnected from server.');
+    };
+
+    ws.onerror = () => {
+      setStatus('Connection error.');
+    };
+  }
+
+  function handleServerMessage(msg) {
+    if (msg.type === 'assigned') {
+      myMark = msg.mark;
+      document.getElementById('joinScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('roomLabel').textContent = 'Room: ' + msg.room;
+      document.getElementById('markLabel').textContent = 'You are: ' + myMark;
+      buildBoard();
+    } else if (msg.type === 'state') {
+      renderBoard(msg.board);
+      updateStatus(msg);
+    } else if (msg.type === 'error') {
+      setStatus('Error: ' + msg.message);
+    } else if (msg.type === 'opponent-left') {
+      setStatus('Your opponent disconnected. Waiting for them to rejoin...');
+    }
+  }
+
+  function buildBoard() {
+    const boardDiv = document.getElementById('board');
+    boardDiv.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.index = i;
+      cell.onclick = () => makeMove(i);
+      boardDiv.appendChild(cell);
+    }
+  }
+
+  function renderBoard(board) {
+    const cells = document.querySelectorAll('.cell');
+    board.forEach((val, i) => {
+      const cell = cells[i];
+      cell.textContent = val ? val : '';
+      cell.classList.remove('x', 'o');
+      if (val === 'X') cell.classList.add('x');
+      if (val === 'O') cell.classList.add('o');
+    });
+  }
+
+  function updateStatus(msg) {
+    if (msg.winner === 'DRAW') {
+      setStatus("It's a draw!");
+    } else if (msg.winner) {
+      setStatus((msg.winner === myMark ? 'You win! 🎉' : 'You lose.') + ' (' + msg.winner + ' wins)');
+    } else if (msg.playersConnected < 2) {
+      setStatus('Waiting for opponent to join room "' + currentRoom + '"...');
+    } else {
+      setStatus(msg.turn === myMark ? 'Your turn' : "Opponent's turn");
+    }
+  }
+
+  function setStatus(text) {
+    document.getElementById('status').textContent = text;
+  }
+
+  function makeMove(index) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'move', room: currentRoom, index: index }));
+  }
+
+  function restartGame() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'restart', room: currentRoom }));
+  }
+</script>
+
+</body>
+</html>
