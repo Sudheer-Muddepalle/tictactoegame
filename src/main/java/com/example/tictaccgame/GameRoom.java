@@ -42,6 +42,7 @@ public class GameRoom {
     }
 
     public synchronized boolean applyMove(int index, String mark) {
+        if (checkWinner() != null) return false;
         if (index < 0 || index > 8) return false;
         if (!mark.equals(turn)) return false;       // not this player's turn
         if (board[index] != null) return false;     // cell already taken
