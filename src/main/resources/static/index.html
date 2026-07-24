@@ -42,26 +42,61 @@
     margin-top: 8px;
   }
   button:active { background: #3a6fd6; }
-  #status { margin: 16px 0; font-size: 18px; min-height: 24px; }
+  #status { margin: 20px 0; 
+           font-size: 20px; 
+           forn-weight: bold;
+           min-height: 28px;
+           padding: 10px 16px;
+           border-radius: 10px;
+           transition: all 0.3s ease;
+          }
+ #status.win {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+  border: 2px solid #2ecc71;
+ }
+  #status.lose {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border: 2px solid #ff6b6b;
+ }
+ #status.draw {
+  background: rgba(150, 150, 150, 0.15);
+  color: #b0b0b0;
+  border: 2px solid #888;
+ }
+ #status.playing {
+  background: rgba(79, 140, 255, 0.1);
+  color: #f0f0f0;
+ }
   #board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin: 16px 0;
+    gap: 10px;
+    margin: 20px 0;
+    padding: 12px;
+    background: #16162a;
+    border-radius: 16px;
+   box-shadow: 0 6px 20px rgba(0,0,0,0.35);
   }
   .cell {
     aspect-ratio: 1;
     background: #2c2c44;
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 48px;
+    font-size: 52px;
     font-weight: bold;
     user-select: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+   transition: transform 0.15s ease, background 0.2s ease;
   }
-  .cell.x { color: #4f8cff; }
-  .cell.o { color: #ff6b6b; }
+  .cell:active {
+   transform: scale(0.95); 
+  }
+  .cell.x { color: #4f8cff; text-shadow: 0 0 12px rgba(79, 140, 255, 0.5);}
+  .cell.o { color: #ff6b6b; text-shadow: 0 0 12px rgba(255, 107, 107, 0.5);}
   #roomLabel { opacity: 0.7; font-size: 14px; }
   #markLabel { font-size: 20px; font-weight: bold; margin: 8px 0; }
 </style>
@@ -161,16 +196,28 @@
   }
 
   function updateStatus(msg) {
-    if (msg.winner === 'DRAW') {
-      setStatus("It's a draw!");
-    } else if (msg.winner) {
-      setStatus((msg.winner === myMark ? 'You win! 🎉' : 'You lose.') + ' (' + msg.winner + ' wins)');
-    } else if (msg.playersConnected < 2) {
-      setStatus('Waiting for opponent to join room "' + currentRoom + '"...');
+  const statusEl = document.getElementById('status');
+  statusEl.classList.remove('win', 'lose', 'draw', 'playing');
+ 
+  if (msg.winner === 'DRAW') {
+    statusEl.classList.add('draw');
+    setStatus("🤝 It's a draw!");
+  } else if (msg.winner) {
+    if (msg.winner === myMark) {
+      statusEl.classList.add('win');
+      setStatus('🎉 You win!');
     } else {
-      setStatus(msg.turn === myMark ? 'Your turn' : "Opponent's turn");
+      statusEl.classList.add('lose');
+      setStatus('😔 You lose. (' + msg.winner + ' wins)');
     }
+  } else if (msg.playersConnected < 2) {
+    statusEl.classList.add('playing');
+    setStatus('Waiting for opponent to join room "' + currentRoom + '"...');
+  } else {
+    statusEl.classList.add('playing');
+    setStatus(msg.turn === myMark ? 'Your turn' : "Opponent's turn");
   }
+}
 
   function setStatus(text) {
     document.getElementById('status').textContent = text;
