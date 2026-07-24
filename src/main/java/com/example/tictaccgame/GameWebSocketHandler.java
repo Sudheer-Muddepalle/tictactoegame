@@ -105,6 +105,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             sendError(session, "Room not found");
             return;
         }
+        if (room.checkWinner() == null){
+            sendError(session, "Invalid move");
+            return;
+        }
         room.reset();
         broadcastState(room);
     }
